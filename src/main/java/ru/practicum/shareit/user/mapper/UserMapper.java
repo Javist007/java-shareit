@@ -23,7 +23,7 @@ public class UserMapper {
                 .build();
     }
 
-    public static void toEntity(UserDto request, User user) {
+    public static void mergeFromDto(UserDto request, User user) {
         if (request.getName() != null) {
             user.setName(request.getName());
         }

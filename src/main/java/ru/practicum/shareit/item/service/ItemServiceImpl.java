@@ -41,7 +41,7 @@ public class ItemServiceImpl implements ItemService {
             throw new ForbiddenException("Только владелец может обновить элемент");
         }
 
-        ItemMapper.toEntity(request, existing);
+        ItemMapper.mergeFromDto(request, existing);
 
         itemStorage.update(existing);
 

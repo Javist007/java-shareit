@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import ru.practicum.shareit.exception.dto.ErrorResponse;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import ru.practicum.shareit.exception.model.BadRequestException;
+import ru.practicum.shareit.exception.model.ValidationException;
 import ru.practicum.shareit.exception.model.ConflictException;
 import ru.practicum.shareit.exception.model.ForbiddenException;
 import ru.practicum.shareit.exception.model.NotFoundException;
@@ -49,9 +49,9 @@ public class GlobalExceptionHandler {
                 .build();
     }
 
-    @ExceptionHandler(BadRequestException.class)
+    @ExceptionHandler(ValidationException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ErrorResponse handleBadRequest(BadRequestException ex) {
+    public ErrorResponse handleBadRequest(ValidationException ex) {
         log.warn("Не верный запрос: {}", ex.getMessage());
         return ErrorResponse.builder()
                 .error("Bad Request")

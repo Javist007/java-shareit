@@ -25,7 +25,7 @@ public final class ItemMapper {
                 .build();
     }
 
-    public static void toEntity(ItemDto request, Item item) {
+    public static void mergeFromDto(ItemDto request, Item item) {
         if (request.getName() != null) {
             item.setName(request.getName());
         }

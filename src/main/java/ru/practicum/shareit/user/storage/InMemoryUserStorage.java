@@ -21,8 +21,8 @@ public class InMemoryUserStorage implements UserStorage {
     }
 
     @Override
-    public Optional<User> findByEmail(String email) {
-        return Optional.ofNullable(this.email.get(email));
+    public boolean existsByEmail(String email) {
+        return this.email.containsKey(email);
     }
 
     @Override
