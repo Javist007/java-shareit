@@ -40,7 +40,12 @@ public class UserServiceImpl implements UserService {
         User user = userStorage.findById(request.getId())
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
 
-        UserMapper.mergeFromDto(request, user);
+        if (request.getName() != null) {
+            user.setName(request.getName());
+        }
+        if (request.getEmail() != null) {
+            user.setEmail(request.getEmail());
+        }
 
         if (request.getEmail() != null && userStorage.existsByEmail(request.getEmail())) {
             throw new ConflictException("Email уже используется");

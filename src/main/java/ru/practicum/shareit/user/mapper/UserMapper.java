@@ -22,13 +22,4 @@ public class UserMapper {
                 .email(user.getEmail())
                 .build();
     }
-
-    public static void mergeFromDto(UserDto request, User user) {
-        if (request.getName() != null) {
-            user.setName(request.getName());
-        }
-        if (request.getEmail() != null) {
-            user.setEmail(request.getEmail());
-        }
-    }
 }

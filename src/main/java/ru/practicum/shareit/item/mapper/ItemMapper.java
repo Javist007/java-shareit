@@ -24,16 +24,4 @@ public final class ItemMapper {
                 .available(request.getAvailable())
                 .build();
     }
-
-    public static void mergeFromDto(ItemDto request, Item item) {
-        if (request.getName() != null) {
-            item.setName(request.getName());
-        }
-        if (request.getDescription() != null) {
-            item.setDescription(request.getDescription());
-        }
-        if (request.getAvailable() != null) {
-            item.setAvailable(request.getAvailable());
-        }
-    }
 }
