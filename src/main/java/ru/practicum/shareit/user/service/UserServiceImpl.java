@@ -10,14 +10,14 @@ import ru.practicum.shareit.user.dto.UserDto;
 import ru.practicum.shareit.user.dto.UserResponse;
 import ru.practicum.shareit.user.mapper.UserMapper;
 import ru.practicum.shareit.user.model.User;
-import ru.practicum.shareit.user.storage.UserStorage;
+import ru.practicum.shareit.user.storage.UserRepository;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
 
-    private final UserStorage userStorage;
+    private final UserRepository userRepository;
 
     @Override
     public UserResponse createUser(UserDto request) {
@@ -25,19 +25,20 @@ public class UserServiceImpl implements UserService {
             throw new ValidationException("Имя или email не указаны");
         }
 
-        if (userStorage.existsByEmail(request.getEmail())) {
+        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
             log.warn("Пользователь с почтой {} уже существует", request.getEmail());
             throw new ConflictException("Email уже используется");
         }
 
         User user = UserMapper.toEntity(request);
 
-        return UserMapper.toResponse(userStorage.create(user));
+        log.debug("Создание пользователя: email={}, name={}", request.getEmail(), request.getName());
+        return UserMapper.toResponse(userRepository.save(user));
     }
 
     @Override
     public UserResponse updateUser(UserDto request) {
-        User user = userStorage.findById(request.getId())
+        User user = userRepository.findById(request.getId())
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
 
         if (request.getName() != null) {
@@ -47,25 +48,26 @@ public class UserServiceImpl implements UserService {
             user.setEmail(request.getEmail());
         }
 
-        if (request.getEmail() != null && userStorage.existsByEmail(request.getEmail())) {
+        if (request.getEmail() != null && userRepository.findByEmail(request.getEmail()).isPresent()) {
             throw new ConflictException("Email уже используется");
         }
 
-        return UserMapper.toResponse(userStorage.update(user));
+        log.info("Пользователь {} обновлён: new data={}", request.getId(), user);
+        return UserMapper.toResponse(userRepository.save(user));
     }
 
     @Override
     public UserResponse getUserById(Long id) {
-        User user = userStorage.findById(id)
+        User user = userRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
         return UserMapper.toResponse(user);
     }
 
     @Override
     public void deleteUser(Long id) {
-        if (userStorage.findById(id).isEmpty()) {
+        if (userRepository.findById(id).isEmpty()) {
             throw new NotFoundException("Пользователь не найден");
         }
-        userStorage.delete(id);
+        userRepository.deleteById(id);
     }
 }
