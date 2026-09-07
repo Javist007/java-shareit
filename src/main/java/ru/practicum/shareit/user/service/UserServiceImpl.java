@@ -41,6 +41,8 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(request.getId())
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
 
+        String oldEmail = user.getEmail();
+
         if (request.getName() != null) {
             user.setName(request.getName());
         }
@@ -48,7 +50,8 @@ public class UserServiceImpl implements UserService {
             user.setEmail(request.getEmail());
         }
 
-        if (request.getEmail() != null && userRepository.findByEmail(request.getEmail()).isPresent()) {
+        if (!oldEmail.equals(user.getEmail()) &&
+            userRepository.findByEmail(user.getEmail()).isPresent()) {
             throw new ConflictException("Email уже используется");
         }
 

@@ -3,6 +3,7 @@ package ru.practicum.shareit.booking.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.shareit.booking.dto.BookingDto;
 import ru.practicum.shareit.booking.dto.BookingResponse;
 import ru.practicum.shareit.booking.enums.BookingState;
@@ -10,8 +11,10 @@ import ru.practicum.shareit.booking.enums.BookingStatus;
 import ru.practicum.shareit.booking.mapper.BookingMapper;
 import ru.practicum.shareit.booking.model.Booking;
 import ru.practicum.shareit.booking.storage.BookingRepository;
+import ru.practicum.shareit.exception.model.ConflictException;
 import ru.practicum.shareit.exception.model.ForbiddenException;
 import ru.practicum.shareit.exception.model.NotFoundException;
+import ru.practicum.shareit.exception.model.ValidationException;
 import ru.practicum.shareit.item.model.Item;
 import ru.practicum.shareit.item.storage.ItemRepository;
 import ru.practicum.shareit.user.model.User;
@@ -44,6 +47,7 @@ public class BookingServiceImpl implements BookingService {
     }
 
     @Override
+    @Transactional
     public BookingResponse create(BookingDto request, long userId) {
         User booker = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
@@ -53,28 +57,40 @@ public class BookingServiceImpl implements BookingService {
         if (!item.getAvailable()) {
             throw new IllegalArgumentException("Вещь недоступна");
         }
-        if (request.getEnd().isBefore(request.getStart()) || request.getEnd().isEqual(request.getStart())) {
-            throw new IllegalArgumentException("Дата окончания должна быть после даты начала");
+
+        if (request.getEnd().isBefore(request.getStart())
+            || request.getEnd().equals(request.getStart())) {
+            throw new ValidationException(
+                    "Дата окончания должна быть после даты начала");
         }
+
         if (item.getOwner().getId() == userId) {
-            throw new IllegalArgumentException("Владелец не может забронировать собственный товар");
+            throw new ConflictException("Владелец не может забронировать собственный товар");
         }
+
         boolean isOverlapping = bookingRepository.existsOverlappingBooking(
                 request.getItemId(), request.getStart(), request.getEnd());
         if (isOverlapping) {
-            throw new IllegalArgumentException("Товар уже забронирован на этот период времени");
+            throw new ConflictException(
+                    "Товар уже забронирован на этот период времени");
         }
 
         Booking booking = BookingMapper.toEntity(request, item, booker);
         Booking saved = bookingRepository.save(booking);
 
-        log.info("Бронирование зарегистрировано: id={}, userId={}, itemId={}", saved.getId(), userId, request.getItemId());
+        log.info("Бронирование зарегистрировано: id={}, userId={}, itemId={}",
+                saved.getId(), userId, request.getItemId());
 
         return BookingMapper.toResponse(saved);
     }
 
     @Override
-    public BookingResponse approve(long bookingId, boolean approved, long userId) {
+    @Transactional
+    public BookingResponse approve(long bookingId, Boolean approved, long userId) {
+        if (approved == null) {
+            throw new ValidationException("Параметр 'approved' обязателен");
+        }
+
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new NotFoundException("Бронирование не найдено"));
 
@@ -83,13 +99,15 @@ public class BookingServiceImpl implements BookingService {
         }
 
         if (booking.getStatus() != BookingStatus.WAITING) {
-            throw new IllegalArgumentException("Бронирование не находится в состоянии WAITING");
+            throw new ConflictException(
+                    "Бронирование не находится в состоянии WAITING");
         }
 
         booking.setStatus(approved ? BookingStatus.APPROVED : BookingStatus.REJECTED);
         Booking saved = bookingRepository.save(booking);
 
-        log.info("Бронирование {}: id={}, userId={}", approved ? "одобрено" : "отклонено", bookingId, userId);
+        log.info("Бронирование {}: id={}, userId={}",
+                approved ? "одобрено" : "отклонено", bookingId, userId);
 
         return BookingMapper.toResponse(saved);
     }

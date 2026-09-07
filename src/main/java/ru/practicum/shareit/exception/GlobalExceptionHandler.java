@@ -3,6 +3,7 @@ package ru.practicum.shareit.exception;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import ru.practicum.shareit.exception.dto.ErrorResponse;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -11,6 +12,10 @@ import ru.practicum.shareit.exception.model.ValidationException;
 import ru.practicum.shareit.exception.model.ConflictException;
 import ru.practicum.shareit.exception.model.ForbiddenException;
 import ru.practicum.shareit.exception.model.NotFoundException;
+
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @RestControllerAdvice
@@ -66,8 +71,34 @@ public class GlobalExceptionHandler {
         log.warn("Не допустимый аргумент: {}", ex.getMessage());
         return ErrorResponse.builder()
                 .status(HttpStatus.BAD_REQUEST.value())
-                .error("Invalid argument")
+                .error("Неверные параметры")
                 .message(ex.getMessage())
+                .build();
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleValidationError(MethodArgumentNotValidException ex) {
+        List<Map<String, String>> details = ex.getBindingResult()
+                .getFieldErrors()
+                .stream()
+                .map(err -> {
+                    assert err.getDefaultMessage() != null;
+                    return Map.of(
+                            "field", err.getField(),
+                            "rejectedValue", err.getRejectedValue() == null
+                                    ? "null" : err.getRejectedValue().toString(),
+                            "message", err.getDefaultMessage());
+                })
+                .collect(Collectors.toList());
+
+        log.warn("Валидация DTO не пройдена: {}", details);
+
+        return ErrorResponse.builder()
+                .error("Bad Request")
+                .status(HttpStatus.BAD_REQUEST.value())
+                .message("Validation failed")
+                .details(details)
                 .build();
     }
 }
