@@ -93,38 +93,37 @@ public class ItemServiceImpl implements ItemService {
 
     @Override
     public List<ItemResponse> findAllOwnerItems(long ownerId) {
-        if (userRepository.findById(ownerId).isEmpty()) {
+        if (!userRepository.existsById(ownerId)) {
             throw new NotFoundException("Пользователь не найден");
         }
 
-        List<Item> items = itemRepository.findByOwnerId(ownerId);
+        List<Item> items = itemRepository.findByOwnerIdWithApprovedBookings(ownerId);
         if (items.isEmpty()) return List.of();
 
         List<Long> itemIds = items.stream().map(Item::getId).toList();
 
-        List<Booking> allApproved = bookingRepository.findAllApprovedForItems(itemIds);
+        Map<Long, List<CommentResponse>> commentsMap = commentRepository.findByItemIdIn(itemIds).stream()
+                .collect(Collectors.groupingBy(
+                        c -> c.getItem().getId(),
+                        Collectors.mapping(CommentMapper::toResponse, Collectors.toList())));
 
         Map<Long, Booking> lastBookings = new HashMap<>();
         Map<Long, Booking> nextBookings = new HashMap<>();
 
-        Map<Long, List<Booking>> byItemId = allApproved.stream()
-                .collect(Collectors.groupingBy(b -> b.getItem().getId()));
+        items.forEach(item -> {
+            List<Booking> bookings = item.getBookings();
+            if (bookings == null || bookings.isEmpty()) return;
 
-        byItemId.forEach((itemId, bookings) -> {
             Booking last = BookingServiceImpl.getLastBooking(bookings);
             Booking next = BookingServiceImpl.getNextBooking(bookings);
-            if (last != null) lastBookings.put(itemId, last);
-            if (next != null) nextBookings.put(itemId, next);
+
+            if (last != null) lastBookings.put(item.getId(), last);
+            if (next != null) nextBookings.put(item.getId(), next);
         });
 
-        Map<Long, List<CommentResponse>> commentsMap = commentRepository.findByItemIdIn(itemIds).stream()
-                .collect(Collectors.groupingBy(
-                        c -> c.getItem().getId(),
-                        Collectors.mapping(CommentMapper::toResponse, Collectors.toList())
-                ));
-
         return items.stream()
-                .map(item -> ItemMapper.toResponse(item,
+                .map(item -> ItemMapper.toResponse(
+                        item,
                         lastBookings.get(item.getId()),
                         nextBookings.get(item.getId()),
                         commentsMap.getOrDefault(item.getId(), List.of())))

@@ -8,10 +8,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import ru.practicum.shareit.exception.dto.ErrorResponse;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import ru.practicum.shareit.exception.model.ValidationException;
-import ru.practicum.shareit.exception.model.ConflictException;
-import ru.practicum.shareit.exception.model.ForbiddenException;
-import ru.practicum.shareit.exception.model.NotFoundException;
+import ru.practicum.shareit.exception.model.*;
 
 import java.util.List;
 import java.util.Map;
@@ -72,6 +69,28 @@ public class GlobalExceptionHandler {
         return ErrorResponse.builder()
                 .status(HttpStatus.BAD_REQUEST.value())
                 .error("Неверные параметры")
+                .message(ex.getMessage())
+                .build();
+    }
+
+    @ExceptionHandler(ItemNotAvailableException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleItemNotAvailable(ItemNotAvailableException ex) {
+        log.warn("Вещь недоступна: {}", ex.getMessage());
+        return ErrorResponse.builder()
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error("Bad Request")
+                .message(ex.getMessage())
+                .build();
+    }
+
+    @ExceptionHandler(CommentNotAllowedException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleCommentNotAllowed(CommentNotAllowedException ex) {
+        log.warn("Невозможно оставить комментарий: {}", ex.getMessage());
+        return ErrorResponse.builder()
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error("Bad Request")
                 .message(ex.getMessage())
                 .build();
     }

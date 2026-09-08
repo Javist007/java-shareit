@@ -25,7 +25,7 @@ public class UserServiceImpl implements UserService {
             throw new ValidationException("Имя или email не указаны");
         }
 
-        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+        if (userRepository.existsByEmail(request.getEmail())) {
             log.warn("Пользователь с почтой {} уже существует", request.getEmail());
             throw new ConflictException("Email уже используется");
         }
@@ -51,7 +51,7 @@ public class UserServiceImpl implements UserService {
         }
 
         if (!oldEmail.equals(user.getEmail()) &&
-            userRepository.findByEmail(user.getEmail()).isPresent()) {
+            userRepository.existsByEmailAndIdNot(user.getEmail(), user.getId())) {
             throw new ConflictException("Email уже используется");
         }
 

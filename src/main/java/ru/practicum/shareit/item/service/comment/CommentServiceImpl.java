@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.shareit.booking.storage.BookingRepository;
+import ru.practicum.shareit.exception.model.CommentNotAllowedException;
 import ru.practicum.shareit.exception.model.NotFoundException;
 import ru.practicum.shareit.item.dto.comment.CommentDto;
 import ru.practicum.shareit.item.dto.comment.CommentResponse;
@@ -38,7 +39,7 @@ public class CommentServiceImpl implements CommentService {
                 itemId, userId);
 
         if (!hasBooked) {
-            throw new IllegalArgumentException("Пользователь не бронировал этот товар и не может оставить отзыв");
+            throw new CommentNotAllowedException("Пользователь не бронировал этот товар и не может оставить отзыв");
         }
 
         Comment comment = CommentMapper.toEntity(request, item, author);

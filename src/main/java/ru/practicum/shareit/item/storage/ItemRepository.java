@@ -11,7 +11,13 @@ import java.util.List;
 @Repository
 public interface ItemRepository extends JpaRepository<Item, Long> {
 
-    List<Item> findByOwnerId(Long ownerId);
+    @Query("""
+            SELECT DISTINCT i FROM Item i
+            LEFT JOIN FETCH i.bookings b
+            WHERE i.owner.id = :ownerId
+              AND (b.status = 'APPROVED' OR b IS NULL)
+            """)
+    List<Item> findByOwnerIdWithApprovedBookings(@Param("ownerId") Long ownerId);
 
     @Query("""
             SELECT i FROM Item i
