@@ -43,59 +43,60 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     boolean existsOverlappingBooking(@Param("itemId") Long itemId,
                                      @Param("start") LocalDateTime start,
                                      @Param("end") LocalDateTime end);
+
     @Query("""
-        SELECT b FROM Booking b JOIN FETCH b.item JOIN FETCH b.booker
-        WHERE b.booker.id = :bookerId AND b.start <= :now AND b.end >= :now
-        ORDER BY b.start DESC""")
+            SELECT b FROM Booking b JOIN FETCH b.item JOIN FETCH b.booker
+            WHERE b.booker.id = :bookerId AND b.start <= :now AND b.end >= :now
+            ORDER BY b.start DESC""")
     List<Booking> findCurrentByBookerId(@Param("bookerId") Long bookerId,
                                         @Param("now") LocalDateTime now);
 
     @Query("""
-        SELECT b FROM Booking b JOIN FETCH b.item JOIN FETCH b.booker
-        WHERE b.booker.id = :bookerId AND b.end < :now
-        ORDER BY b.start DESC""")
+            SELECT b FROM Booking b JOIN FETCH b.item JOIN FETCH b.booker
+            WHERE b.booker.id = :bookerId AND b.end < :now
+            ORDER BY b.start DESC""")
     List<Booking> findPastByBookerId(@Param("bookerId") Long bookerId,
                                      @Param("now") LocalDateTime now);
 
     @Query("""
-        SELECT b FROM Booking b JOIN FETCH b.item JOIN FETCH b.booker
-        WHERE b.booker.id = :bookerId AND b.start > :now
-        ORDER BY b.start DESC""")
+            SELECT b FROM Booking b JOIN FETCH b.item JOIN FETCH b.booker
+            WHERE b.booker.id = :bookerId AND b.start > :now
+            ORDER BY b.start DESC""")
     List<Booking> findFutureByBookerId(@Param("bookerId") Long bookerId,
                                        @Param("now") LocalDateTime now);
 
     @Query("""
-        SELECT b FROM Booking b JOIN FETCH b.item JOIN FETCH b.booker
-        WHERE b.booker.id = :bookerId AND b.status = :status
-        ORDER BY b.start DESC""")
+            SELECT b FROM Booking b JOIN FETCH b.item JOIN FETCH b.booker
+            WHERE b.booker.id = :bookerId AND b.status = :status
+            ORDER BY b.start DESC""")
     List<Booking> findByBookerIdAndStatus(@Param("bookerId") Long bookerId,
                                           @Param("status") BookingStatus status);
 
     @Query("""
-        SELECT b FROM Booking b JOIN FETCH b.item JOIN FETCH b.booker
-        WHERE b.item.owner.id = :ownerId AND b.start <= :now AND b.end >= :now
-        ORDER BY b.start DESC""")
+            SELECT b FROM Booking b JOIN FETCH b.item JOIN FETCH b.booker
+            WHERE b.item.owner.id = :ownerId AND b.start <= :now AND b.end >= :now
+            ORDER BY b.start DESC""")
     List<Booking> findCurrentByOwnerId(@Param("ownerId") Long ownerId,
                                        @Param("now") LocalDateTime now);
 
     @Query("""
-        SELECT b FROM Booking b JOIN FETCH b.item JOIN FETCH b.booker
-        WHERE b.item.owner.id = :ownerId AND b.end < :now
-        ORDER BY b.start DESC""")
+            SELECT b FROM Booking b JOIN FETCH b.item JOIN FETCH b.booker
+            WHERE b.item.owner.id = :ownerId AND b.end < :now
+            ORDER BY b.start DESC""")
     List<Booking> findPastByOwnerId(@Param("ownerId") Long ownerId,
                                     @Param("now") LocalDateTime now);
 
     @Query("""
-        SELECT b FROM Booking b JOIN FETCH b.item JOIN FETCH b.booker
-        WHERE b.item.owner.id = :ownerId AND b.start > :now
-        ORDER BY b.start DESC""")
+            SELECT b FROM Booking b JOIN FETCH b.item JOIN FETCH b.booker
+            WHERE b.item.owner.id = :ownerId AND b.start > :now
+            ORDER BY b.start DESC""")
     List<Booking> findFutureByOwnerId(@Param("ownerId") Long ownerId,
                                       @Param("now") LocalDateTime now);
 
     @Query("""
-        SELECT b FROM Booking b JOIN FETCH b.item JOIN FETCH b.booker
-        WHERE b.item.owner.id = :ownerId AND b.status = :status
-        ORDER BY b.start DESC""")
+            SELECT b FROM Booking b JOIN FETCH b.item JOIN FETCH b.booker
+            WHERE b.item.owner.id = :ownerId AND b.status = :status
+            ORDER BY b.start DESC""")
     List<Booking> findByItemOwnerIdAndStatus(@Param("ownerId") Long ownerId,
                                              @Param("status") BookingStatus status);
 }

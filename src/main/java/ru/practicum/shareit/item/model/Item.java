@@ -14,7 +14,6 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(of = "id")
 public class Item {
 
     @Id
@@ -38,5 +37,6 @@ public class Item {
             cascade = CascadeType.ALL,
             orphanRemoval = true,
             fetch = FetchType.LAZY)
+    @Builder.Default
     private List<Booking> bookings = new ArrayList<>();
 }
