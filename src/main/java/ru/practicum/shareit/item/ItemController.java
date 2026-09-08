@@ -4,9 +4,12 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
-import ru.practicum.shareit.item.dto.ItemDto;
-import ru.practicum.shareit.item.dto.ItemResponse;
-import ru.practicum.shareit.item.service.ItemService;
+import ru.practicum.shareit.item.dto.comment.CommentDto;
+import ru.practicum.shareit.item.dto.comment.CommentResponse;
+import ru.practicum.shareit.item.dto.item.ItemDto;
+import ru.practicum.shareit.item.dto.item.ItemResponse;
+import ru.practicum.shareit.item.service.comment.CommentService;
+import ru.practicum.shareit.item.service.item.ItemService;
 
 import java.util.List;
 
@@ -17,6 +20,7 @@ import java.util.List;
 public class ItemController {
 
     private final ItemService itemService;
+    private final CommentService commentService;
 
     @PostMapping
     public ItemResponse create(@Valid @RequestBody ItemDto request,
@@ -36,15 +40,16 @@ public class ItemController {
     }
 
     @GetMapping("/{itemId}")
-    public ItemResponse getItem(@PathVariable long itemId) {
-        log.debug("Получение вещи: id={}", itemId);
-        return itemService.getItemById(itemId);
+    public ItemResponse getItem(@PathVariable long itemId,
+                                @RequestHeader("X-Sharer-User-Id") long userId) {
+        log.debug("Получение вещи: id={}, userId={}", itemId, userId);
+        return itemService.getItemById(itemId, userId);
     }
 
     @GetMapping
     public List<ItemResponse> getAll(@RequestHeader("X-Sharer-User-Id") long userId) {
         log.debug("Получение вещей пользователя: userId={}", userId);
-        return itemService.findAllByOwner(userId);
+        return itemService.findAllOwnerItems(userId);
     }
 
     @GetMapping("/search")
@@ -53,4 +58,11 @@ public class ItemController {
         return itemService.search(text);
     }
 
+    @PostMapping("/{itemId}/comment")
+    public CommentResponse addComment(@PathVariable long itemId,
+                                      @Valid @RequestBody CommentDto request,
+                                      @RequestHeader("X-Sharer-User-Id") long userId) {
+        log.info("Добавление комментария: itemId={}, userId={}", itemId, userId);
+        return commentService.addComment(itemId, request, userId);
+    }
 }
