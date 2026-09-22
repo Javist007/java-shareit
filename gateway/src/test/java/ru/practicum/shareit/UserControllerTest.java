@@ -26,6 +26,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import ru.practicum.shareit.user.UserClient;
 import ru.practicum.shareit.user.UserController;
 
+@DisplayName("MockMVC тесты для UserController")
 @WebMvcTest(UserController.class)
 class UserControllerTest {
     @Autowired

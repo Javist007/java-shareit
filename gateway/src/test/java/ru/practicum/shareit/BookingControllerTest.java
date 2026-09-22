@@ -26,6 +26,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
+@DisplayName("MockMVC тесты для BookingController")
 @WebMvcTest(BookingController.class)
 class BookingControllerTest {
 

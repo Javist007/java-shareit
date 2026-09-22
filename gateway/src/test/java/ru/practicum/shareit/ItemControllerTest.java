@@ -24,6 +24,7 @@ import ru.practicum.shareit.item.ItemClient;
 import ru.practicum.shareit.item.ItemController;
 import ru.practicum.shareit.item.dto.ItemDto;
 
+@DisplayName("MockMVC тесты для ItemController")
 @WebMvcTest(ItemController.class)
 class ItemControllerTest {
 

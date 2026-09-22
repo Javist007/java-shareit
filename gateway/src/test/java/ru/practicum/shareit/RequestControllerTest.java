@@ -24,6 +24,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import ru.practicum.shareit.request.RequestClient;
 import ru.practicum.shareit.request.RequestController;
 
+@DisplayName("MockMVC тесты для RequestController")
 @WebMvcTest(RequestController.class)
 class RequestControllerTest {
 
