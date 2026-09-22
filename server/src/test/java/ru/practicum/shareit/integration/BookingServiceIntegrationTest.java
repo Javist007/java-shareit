@@ -11,13 +11,15 @@ import ru.practicum.shareit.booking.dto.BookingResponse;
 import ru.practicum.shareit.booking.enums.BookingState;
 import ru.practicum.shareit.booking.enums.BookingStatus;
 import ru.practicum.shareit.booking.service.BookingService;
+
+import jakarta.persistence.EntityManager;
+import ru.practicum.shareit.booking.storage.BookingRepository;
+import ru.practicum.shareit.exception.model.ConflictException;
+import ru.practicum.shareit.exception.model.ForbiddenException;
+import ru.practicum.shareit.exception.model.ItemNotAvailableException;
+import ru.practicum.shareit.exception.model.ValidationException;
 import ru.practicum.shareit.item.model.Item;
-import ru.practicum.shareit.request.model.ItemRequest;
 import ru.practicum.shareit.user.model.User;
-import ru.practicum.shareit.exception.model.*;
-import ru.practicum.shareit.item.storage.ItemRepository;
-import ru.practicum.shareit.request.storage.ItemRequestRepository;
-import ru.practicum.shareit.user.storage.UserRepository;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -31,140 +33,310 @@ class BookingServiceIntegrationTest {
 
     @Autowired
     private BookingService bookingService;
-    @Autowired
-    private UserRepository userRepo;
-    @Autowired
-    private ItemRepository itemRepo;
-    @Autowired
-    private ItemRequestRepository requestRepo;
 
-    private User booker;
+    @Autowired
+    private EntityManager entityManager;
+
+    @Autowired
+    private BookingRepository bookingRepository;
+
     private User owner;
+    private User booker;
     private Item item;
-    private final LocalDateTime now = LocalDateTime.now();
 
     @BeforeEach
     void setUp() {
-        booker = userRepo.save(User.builder()
-                .name("Booker").email("booker@example.com").build());
-        owner = userRepo.save(User.builder()
-                .name("Owner").email("owner@example.com").build());
-
-        ItemRequest req = requestRepo.save(ItemRequest.builder()
-                .description("Need a drill")
-                .requestor(owner).created(now)
+        owner = persist(User.builder()
+                .name("Owner")
+                .email("owner@example.com")
                 .build());
 
-        item = itemRepo.save(Item.builder()
-                .name("Drill").description("Electric drill")
-                .available(true).owner(owner).request(req).build());
+        booker = persist(User.builder()
+                .name("Booker")
+                .email("booker@example.com")
+                .build());
+
+        item = new Item();
+        item.setName("Drill");
+        item.setDescription("Cordless drill");
+        item.setAvailable(true);
+        item.setOwner(owner);
+
+        persist(item);
     }
 
     @Test
-    @DisplayName("Должен создать бронирование и вернуть его со статусом WAITING")
-    void shouldCreateBooking() {
-        BookingDto dto = BookingDto.builder()
-                .itemId(item.getId())
-                .start(now.plusHours(1))
-                .end(now.plusHours(5))
-                .build();
+    @DisplayName("Создание бронирования успешно")
+    void testCreateBookingSuccess() {
+        LocalDateTime start = LocalDateTime.now().plusDays(1);
+        LocalDateTime end = LocalDateTime.now().plusDays(2);
 
-        BookingResponse response = bookingService.create(dto, booker.getId());
+        BookingResponse response =
+                bookingService.create(bookingDto(start, end), booker.getId());
 
-        assertEquals(booker.getId(), response.getBooker().getId());
+        assertNotNull(response);
+        assertEquals(BookingStatus.WAITING,
+                response.getStatus());
         assertEquals(item.getId(), response.getItem().getId());
-        assertEquals(BookingStatus.WAITING, response.getStatus());
-
-        List<BookingResponse> all = bookingService.findAllByBooker(BookingState.ALL, booker.getId());
-        assertEquals(1, all.size());
-        BookingResponse b = all.getFirst();
-        assertEquals(BookingStatus.WAITING, b.getStatus());
+        assertEquals(booker.getId(), response.getBooker().getId());
+        assertEquals(1L, bookingRepository.count());
     }
 
     @Test
-    @DisplayName("Должен одобрить бронирование и отклонить несанкционированные попытки")
-    void shouldApproveBooking() {
-        BookingDto dto = BookingDto.builder()
-                .itemId(item.getId())
-                .start(now.plusHours(2))
-                .end(now.plusHours(6))
-                .build();
-        BookingResponse created = bookingService.create(dto, booker.getId());
+    @DisplayName("Создание бронирования с недоступным предметом выбрасывает ItemNotAvailableException")
+    void testCreateBookingItemNotAvailable() {
+        item.setAvailable(false);
+        entityManager.merge(item);
+        entityManager.flush();
 
-        BookingResponse approved = bookingService.approve(created.getId(), true, owner.getId());
-        assertEquals(BookingStatus.APPROVED, approved.getStatus());
+        LocalDateTime start = LocalDateTime.now().plusDays(1);
+        LocalDateTime end = LocalDateTime.now().plusDays(2);
 
         assertThrows(
-                ForbiddenException.class,
-                () -> bookingService.approve(created.getId(), false, booker.getId()));
+                ItemNotAvailableException.class,
+                () -> bookingService.create(bookingDto(start, end), booker.getId()));
     }
 
     @Test
-    @DisplayName("Должен отклонить пересекающиеся бронирования")
-    void shouldRejectOverlappingBookings() {
-        BookingDto dto1 = BookingDto.builder()
-                .itemId(item.getId())
-                .start(now.plusHours(10))
-                .end(now.plusHours(20))
-                .build();
-        BookingResponse created1 = bookingService.create(dto1, booker.getId());
-        bookingService.approve(created1.getId(), true, owner.getId());
-
-        BookingDto dto2 = BookingDto.builder()
-                .itemId(item.getId())
-                .start(now.plusHours(15))
-                .end(now.plusHours(25))
-                .build();
+    @DisplayName("Создание бронирования собственным предметом выбрасывает ConflictException")
+    void testCreateBookingOwnItemConflict() {
+        LocalDateTime start = LocalDateTime.now().plusDays(1);
+        LocalDateTime end = LocalDateTime.now().plusDays(2);
 
         assertThrows(
                 ConflictException.class,
-                () -> bookingService.create(dto2, booker.getId()));
+                () -> bookingService.create(bookingDto(start, end), owner.getId()));
     }
 
     @Test
-    @DisplayName("Только владелец или заявитель могут читать бронирование")
-    void shouldAllowOnlyOwnerOrBookerToRead() {
-        BookingDto dto = BookingDto.builder()
-                .itemId(item.getId())
-                .start(now.plusHours(3))
-                .end(now.plusHours(7))
-                .build();
-        BookingResponse created = bookingService.create(dto, booker.getId());
+    @DisplayName("Создание бронирования с неверными датами выбрасывает ValidationException")
+    void testCreateBookingInvalidDates() {
+        LocalDateTime start = LocalDateTime.now().plusDays(2);
+        LocalDateTime end = LocalDateTime.now().plusDays(1);
 
-        assertDoesNotThrow(() -> bookingService.findById(created.getId(), booker.getId()));
-        assertDoesNotThrow(() -> bookingService.findById(created.getId(), owner.getId()));
+        assertThrows(
+                ValidationException.class,
+                () -> bookingService.create(bookingDto(start, end), booker.getId()));
+    }
 
-        User outsider = userRepo.save(User.builder()
-                .name("Outsider").email("out@example.com").build());
+    @Test
+    @DisplayName("Утверждение бронирования успешно")
+    void testApproveBookingSuccess() {
+        LocalDateTime start = LocalDateTime.now().plusDays(1);
+        LocalDateTime end = LocalDateTime.now().plusDays(2);
+
+        BookingResponse created =
+                bookingService.create(bookingDto(start, end), booker.getId());
+
+        BookingResponse approved =
+                bookingService.approve(created.getId(), true, owner.getId());
+
+        assertEquals(BookingStatus.APPROVED,
+                approved.getStatus());
+    }
+
+    @Test
+    @DisplayName("Отклонение бронирования")
+    void testApproveBookingReject() {
+        LocalDateTime start = LocalDateTime.now().plusDays(1);
+        LocalDateTime end = LocalDateTime.now().plusDays(2);
+
+        BookingResponse created =
+                bookingService.create(bookingDto(start, end), booker.getId());
+
+        BookingResponse rejected =
+                bookingService.approve(created.getId(), false, owner.getId());
+
+        assertEquals(BookingStatus.REJECTED,
+                rejected.getStatus());
+    }
+
+    @Test
+    @DisplayName("Невозможно утвердить бронирование чужим пользователем")
+    void testApproveForbiddenOwner() {
+        LocalDateTime start = LocalDateTime.now().plusDays(1);
+        LocalDateTime end = LocalDateTime.now().plusDays(2);
+
+        BookingResponse created =
+                bookingService.create(bookingDto(start, end), booker.getId());
+
+        assertThrows(
+                ForbiddenException.class,
+                () -> bookingService.approve(created.getId(), true, booker.getId()));
+    }
+
+    @Test
+    @DisplayName("Попытка повторного утверждения уже одобренного бронирования выбрасывает ConflictException")
+    void testApproveAlreadyApproved() {
+        LocalDateTime start = LocalDateTime.now().plusDays(1);
+        LocalDateTime end = LocalDateTime.now().plusDays(2);
+
+        BookingResponse created =
+                bookingService.create(bookingDto(start, end), booker.getId());
+
+        bookingService.approve(created.getId(), true, owner.getId());
+
+        assertThrows(
+                ConflictException.class,
+                () -> bookingService.approve(created.getId(), false, owner.getId()));
+    }
+
+    @Test
+    @DisplayName("Получение бронирования с разрешением (владелец или бронирующий)")
+    void testFindByIdWithPermission() {
+        LocalDateTime start = LocalDateTime.now().plusDays(1);
+        LocalDateTime end = LocalDateTime.now().plusDays(2);
+
+        BookingResponse created =
+                bookingService.create(bookingDto(start, end), booker.getId());
+
+        assertEquals(created.getId(),
+                bookingService.findById(created.getId(), booker.getId()).getId());
+        assertEquals(created.getId(),
+                bookingService.findById(created.getId(), owner.getId()).getId());
+
+        User outsider =
+                persist(User.builder()
+                        .name("Other")
+                        .email("other@example.com")
+                        .build());
+
         assertThrows(
                 ForbiddenException.class,
                 () -> bookingService.findById(created.getId(), outsider.getId()));
     }
 
     @Test
-    @DisplayName("Бронирования должны возвращаться корректно по фильтрам состояния")
-    void shouldReturnBookingsByState() {
-        BookingDto past = BookingDto.builder()
+    @DisplayName("Получение всех бронирований по состояниям для бронирующего")
+    void testFindAllByBookerStates() {
+        LocalDateTime now = LocalDateTime.now();
+
+        bookingService.create(bookingDto(now.minusDays(5), now.minusDays(4)), booker.getId());
+
+        bookingService.create(bookingDto(now.minusHours(1), now.plusHours(1)), booker.getId());
+
+        bookingService.create(bookingDto(now.plusDays(2), now.plusDays(3)), booker.getId());
+
+        BookingResponse rejected =
+                bookingService.create(bookingDto(now.minusDays(10), now.minusDays(9)),
+                        booker.getId());
+        bookingService.approve(rejected.getId(), false, owner.getId());
+
+        BookingResponse approved =
+                bookingService.create(bookingDto(now.minusHours(2), now.plusHours(2)),
+                        booker.getId());
+        bookingService.approve(approved.getId(), true, owner.getId());
+
+        List<BookingResponse> all =
+                bookingService.findAllByBooker(
+                        BookingState.ALL,
+                        booker.getId());
+        assertEquals(5, all.size());
+
+        List<BookingResponse> current =
+                bookingService.findAllByBooker(
+                        BookingState.CURRENT,
+                        booker.getId());
+        assertEquals(2, current.size());
+
+        List<BookingResponse> past =
+                bookingService.findAllByBooker(
+                        BookingState.PAST,
+                        booker.getId());
+        assertEquals(2, past.size());
+
+        List<BookingResponse> future =
+                bookingService.findAllByBooker(
+                        BookingState.FUTURE,
+                        booker.getId());
+        assertEquals(1, future.size());
+
+        List<BookingResponse> waiting =
+                bookingService.findAllByBooker(
+                        BookingState.WAITING,
+                        booker.getId());
+        assertEquals(3, waiting.size());
+
+
+        List<BookingResponse> rejectedList =
+                bookingService.findAllByBooker(
+                        BookingState.REJECTED,
+                        booker.getId());
+        assertEquals(1, rejectedList.size());
+    }
+
+    @Test
+    @DisplayName("Получение всех бронирований по состояниям для владельца")
+    void testFindAllByOwnerStates() {
+        LocalDateTime now = LocalDateTime.now();
+
+        bookingService.create(bookingDto(now.minusDays(5), now.minusDays(4)), booker.getId());
+
+        bookingService.create(bookingDto(now.minusHours(1), now.plusHours(1)), booker.getId());
+
+        bookingService.create(bookingDto(now.plusDays(2), now.plusDays(3)), booker.getId());
+
+        BookingResponse rejected =
+                bookingService.create(bookingDto(now.minusDays(10), now.minusDays(9)),
+                        booker.getId());
+        bookingService.approve(rejected.getId(), false, owner.getId());
+
+        BookingResponse approved =
+                bookingService.create(bookingDto(now.minusHours(2), now.plusHours(2)),
+                        booker.getId());
+        bookingService.approve(approved.getId(), true, owner.getId());
+
+        List<BookingResponse> all =
+                bookingService.findAllByOwner(
+                        BookingState.ALL,
+                        owner.getId());
+        assertEquals(5, all.size());
+
+        List<BookingResponse> current =
+                bookingService.findAllByOwner(
+                        BookingState.CURRENT,
+                        owner.getId());
+        assertEquals(2, current.size());
+
+        List<BookingResponse> past =
+                bookingService.findAllByOwner(
+                        BookingState.PAST,
+                        owner.getId());
+        assertEquals(2, past.size());
+
+        List<BookingResponse> future =
+                bookingService.findAllByOwner(
+                        BookingState.FUTURE,
+                        owner.getId());
+        assertEquals(1, future.size());
+
+        List<BookingResponse> waiting =
+                bookingService.findAllByOwner(
+                        BookingState.WAITING,
+                        owner.getId());
+        assertEquals(3, waiting.size());
+
+        List<BookingResponse> rejectedList =
+                bookingService.findAllByOwner(
+                        BookingState.REJECTED,
+                        owner.getId());
+        assertEquals(1, rejectedList.size());
+    }
+
+
+    @SuppressWarnings("uncheck")
+    private <T> T persist(T entity) {
+        entityManager.persist(entity);
+        entityManager.flush();
+        return entity;
+    }
+
+    private BookingDto bookingDto(LocalDateTime start,
+                                  LocalDateTime end) {
+        return BookingDto.builder()
                 .itemId(item.getId())
-                .start(now.minusDays(5))
-                .end(now.minusDays(4))
+                .start(start)
+                .end(end)
                 .build();
-        bookingService.create(past, booker.getId());
-
-        BookingDto future = BookingDto.builder()
-                .itemId(item.getId())
-                .start(now.plusDays(2))
-                .end(now.plusDays(3))
-                .build();
-        bookingService.create(future, booker.getId());
-
-        List<BookingResponse> all = bookingService.findAllByBooker(BookingState.ALL, booker.getId());
-        assertEquals(2, all.size());
-
-        List<BookingResponse> pastRes = bookingService.findAllByBooker(BookingState.PAST, booker.getId());
-        assertTrue(pastRes.isEmpty() || pastRes.getFirst().getEnd().isBefore(now));
-
-        List<BookingResponse> futureRes = bookingService.findAllByOwner(BookingState.FUTURE, owner.getId());
-        assertTrue(futureRes.isEmpty() || futureRes.getFirst().getStart().isAfter(now));
     }
 }

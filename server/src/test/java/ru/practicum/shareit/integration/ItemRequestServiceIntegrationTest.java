@@ -77,4 +77,12 @@ class ItemRequestServiceIntegrationTest {
                 NotFoundException.class,
                 () -> requestService.getById(999L));
     }
+
+    @Test
+    @DisplayName("Запрос по неизвестному ID → NotFoundException")
+    void getByUnknownIdThrows() {
+        assertThrows(
+                NotFoundException.class,
+                () -> requestService.getById(999L));
+    }
 }

@@ -158,4 +158,11 @@ class ItemServiceIntegrationTest {
         assertThrows(NotFoundException.class,
                 () -> itemService.getItemById(999L, owner.getId()));
     }
+
+    @Test
+    @DisplayName("Поиск с пустой строкой возвращает пустой список (early‑return)")
+    void searchWithEmptyTextReturnsEmptyList() {
+        var result = itemService.search("");
+        assertTrue(result.isEmpty());
+    }
 }

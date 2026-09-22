@@ -90,4 +90,18 @@ class UserServiceIntegrationTest {
         userService.deleteUser(response.getId());
         assertFalse(userRepo.existsById(response.getId()));
     }
+
+    @Test
+    @DisplayName("Обновить несуществующего пользователя → NotFoundException")
+    void updateNonExistingUser() {
+        UserDto dto = UserDto.builder()
+                .id(999L)
+                .name("Nobody")
+                .email("nobody@example.com")
+                .build();
+
+        assertThrows(
+                NotFoundException.class,
+                () -> userService.updateUser(dto));
+    }
 }
