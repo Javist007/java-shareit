@@ -150,6 +150,7 @@ class ItemControllerTest {
                         .header(USER_ID_HEADER, 1))
                 .andExpect(status().isNotFound());
     }
+
     @Test
     @DisplayName("Покрытие ItemNotAvailableException")
     void testItemNotAvailable() throws Exception {

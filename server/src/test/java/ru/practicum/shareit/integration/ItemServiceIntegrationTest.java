@@ -213,7 +213,7 @@ class ItemServiceIntegrationTest {
     }
 
     @Test
-    @DisplayName("Получение списка вещей владельца, у которого нет вещей (пустой список)")
+    @DisplayName("Получение списка вещей владельца, у которого нет вещей")
     void testFindAllOwnerItemsEmpty() {
         User newOwner = userRepo.save(User.builder()
                 .name("NoItems").email("noitems@example.com").build());
@@ -244,7 +244,7 @@ class ItemServiceIntegrationTest {
     }
 
     @Test
-    @DisplayName(" findAllOwnerItems - Полное покрытие (есть вещи, есть бронирования и комментарии)")
+    @DisplayName(" findAllOwnerItems - Полное покрытие")
     void findAllOwnerItems_FullCoverage() {
 
         User owner = userRepo.save(User.builder()
