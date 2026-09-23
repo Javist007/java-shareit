@@ -6,6 +6,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
+import ru.practicum.shareit.booking.dto.BookingDto;
+import ru.practicum.shareit.item.dto.comment.CommentCreateDto;
 import ru.practicum.shareit.item.dto.item.ItemDto;
 import ru.practicum.shareit.item.dto.item.ItemResponse;
 import ru.practicum.shareit.item.service.item.ItemService;
@@ -17,6 +19,7 @@ import ru.practicum.shareit.request.storage.ItemRequestRepository;
 import ru.practicum.shareit.user.storage.UserRepository;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -162,7 +165,113 @@ class ItemServiceIntegrationTest {
     @Test
     @DisplayName("Поиск с пустой строкой возвращает пустой список (early‑return)")
     void searchWithEmptyTextReturnsEmptyList() {
-        var result = itemService.search("");
+        List<ItemResponse> result = itemService.search("");
         assertTrue(result.isEmpty());
+    }
+
+    @Test
+    @DisplayName("Обновление предмета не владельцем -> ForbiddenException")
+    void testUpdateItemByNonOwner() {
+        ItemDto dto = ItemDto.builder()
+                .name("Original Name")
+                .description("Original Description")
+                .available(true)
+                .build();
+
+        ItemResponse created = itemService.addItem(dto, owner.getId());
+        long itemId = created.getId();
+
+        ItemDto updateDto = ItemDto.builder()
+                .name("New Name")
+                .description("New Description")
+                .available(true)
+                .build();
+
+        assertThrows(ForbiddenException.class,
+                () -> itemService.updateItem(itemId, updateDto, outsider.getId()));
+    }
+
+    @Test
+    @DisplayName("Получение предмета по несуществующему ID -> NotFoundException")
+    void testGetItemByIdNotFound() {
+        assertThrows(NotFoundException.class,
+                () -> itemService.getItemById(999L, owner.getId()));
+    }
+
+    @Test
+    @DisplayName("Поиск предмета по частичному совпадению в описании")
+    void testSearchPartialDescription() {
+        ItemDto dto = ItemDto.builder()
+                .name("UniqueName")
+                .description("Specific description for searching")
+                .available(true)
+                .build();
+        itemService.addItem(dto, owner.getId());
+
+        List<ItemResponse> result = itemService.search("description for searching");
+        assertFalse(result.isEmpty());
+    }
+
+    @Test
+    @DisplayName("Получение списка вещей владельца, у которого нет вещей (пустой список)")
+    void testFindAllOwnerItemsEmpty() {
+        User newOwner = userRepo.save(User.builder()
+                .name("NoItems").email("noitems@example.com").build());
+
+        List<ItemResponse> result = itemService.findAllOwnerItems(newOwner.getId());
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    @DisplayName(" findAllOwnerItems - Пользователь не найден")
+    void findAllOwnerItems_UserNotFound() {
+        long nonExistentId = 999L;
+        assertThrows(NotFoundException.class,
+                () -> itemService.findAllOwnerItems(nonExistentId));
+    }
+
+    @Test
+    @DisplayName("findAllOwnerItems - Вещей нет (пустой список)")
+    void findAllOwnerItems_NoItems() {
+        User newUser = userRepo.save(User.builder()
+                .name("User No Items")
+                .email("no_items_user_" + System.currentTimeMillis() + "@example.com")
+                .build());
+
+        List<ItemResponse> result = itemService.findAllOwnerItems(newUser.getId());
+
+        assertTrue(result.isEmpty(), "Список должен быть пустым, так как у пользователя нет вещей");
+    }
+
+    @Test
+    @DisplayName(" findAllOwnerItems - Полное покрытие (есть вещи, есть бронирования и комментарии)")
+    void findAllOwnerItems_FullCoverage() {
+
+        User owner = userRepo.save(User.builder()
+                .name("Owner")
+                .email("owner_full@example.com")
+                .build());
+
+        ItemDto dto = ItemDto.builder()
+                .name("Full Item")
+                .description("Full Description")
+                .available(true)
+                .build();
+        ItemResponse created = itemService.addItem(dto, owner.getId());
+        long itemId = created.getId();
+
+        BookingDto bookingDto = BookingDto.builder()
+                .itemId(itemId)
+                .start(LocalDateTime.now().plusDays(1))
+                .end(LocalDateTime.now().plusDays(2))
+                .build();
+
+        CommentCreateDto commentDto = new CommentCreateDto();
+        commentDto.setText("Great item!");
+
+        List<ItemResponse> result = itemService.findAllOwnerItems(owner.getId());
+
+        assertFalse(result.isEmpty());
+        assertEquals("Full Item", result.getFirst().getName());
     }
 }

@@ -14,10 +14,7 @@ import ru.practicum.shareit.booking.service.BookingService;
 
 import jakarta.persistence.EntityManager;
 import ru.practicum.shareit.booking.storage.BookingRepository;
-import ru.practicum.shareit.exception.model.ConflictException;
-import ru.practicum.shareit.exception.model.ForbiddenException;
-import ru.practicum.shareit.exception.model.ItemNotAvailableException;
-import ru.practicum.shareit.exception.model.ValidationException;
+import ru.practicum.shareit.exception.model.*;
 import ru.practicum.shareit.item.model.Item;
 import ru.practicum.shareit.user.model.User;
 
@@ -323,6 +320,70 @@ class BookingServiceIntegrationTest {
         assertEquals(1, rejectedList.size());
     }
 
+    @Test
+    @DisplayName("Создание бронирования для несуществующего пользователя -> NotFoundException")
+    void testCreateBookingNonExistentUser() {
+        LocalDateTime start = LocalDateTime.now().plusDays(1);
+        LocalDateTime end = LocalDateTime.now().plusDays(2);
+
+        assertThrows(NotFoundException.class,
+                () -> bookingService.create(bookingDto(start, end), 999L));
+    }
+
+    @Test
+    @DisplayName("Создание бронирования для несуществующего товара -> NotFoundException")
+    void testCreateBookingNonExistentItem() {
+        LocalDateTime start = LocalDateTime.now().plusDays(1);
+        LocalDateTime end = LocalDateTime.now().plusDays(2);
+
+        assertThrows(NotFoundException.class,
+                () -> bookingService.create(BookingDto.builder()
+                        .itemId(999L)
+                        .start(start)
+                        .end(end)
+                        .build(), booker.getId()));
+    }
+
+    @Test
+    @DisplayName("Создание бронирования с пересекающимися датами -> ConflictException")
+    void testCreateBookingOverlapping() {
+        LocalDateTime start1 = LocalDateTime.now().plusDays(1);
+        LocalDateTime end1 = LocalDateTime.now().plusDays(3);
+
+        BookingResponse first = bookingService.create(bookingDto(start1, end1), booker.getId());
+
+        bookingService.approve(first.getId(), true, owner.getId());
+
+        LocalDateTime start2 = LocalDateTime.now().plusDays(2);
+        LocalDateTime end2 = LocalDateTime.now().plusDays(4);
+
+        assertThrows(ConflictException.class,
+                () -> bookingService.create(bookingDto(start2, end2), booker.getId()));
+    }
+
+    @Test
+    @DisplayName("Проверка всех состояний findAllByBooker")
+    void testAllBookingStatesCoverage() {
+        LocalDateTime now = LocalDateTime.now();
+
+        bookingService.create(bookingDto(now.minusDays(5), now.minusDays(4)), booker.getId());
+
+        bookingService.create(bookingDto(now.plusDays(2), now.plusDays(3)), booker.getId());
+
+        bookingService.create(bookingDto(now.minusHours(1), now.plusHours(1)), booker.getId());
+
+        bookingService.create(bookingDto(now.plusDays(10), now.plusDays(11)), booker.getId());
+
+        BookingResponse rejected = bookingService.create(bookingDto(now.minusDays(10), now.minusDays(9)), booker.getId());
+        bookingService.approve(rejected.getId(), false, owner.getId());
+
+        assertFalse(bookingService.findAllByBooker(BookingState.ALL, booker.getId()).isEmpty());
+        assertFalse(bookingService.findAllByBooker(BookingState.CURRENT, booker.getId()).isEmpty());
+        assertFalse(bookingService.findAllByBooker(BookingState.PAST, booker.getId()).isEmpty());
+        assertFalse(bookingService.findAllByBooker(BookingState.FUTURE, booker.getId()).isEmpty());
+        assertFalse(bookingService.findAllByBooker(BookingState.WAITING, booker.getId()).isEmpty());
+        assertFalse(bookingService.findAllByBooker(BookingState.REJECTED, booker.getId()).isEmpty());
+    }
 
     @SuppressWarnings("uncheck")
     private <T> T persist(T entity) {

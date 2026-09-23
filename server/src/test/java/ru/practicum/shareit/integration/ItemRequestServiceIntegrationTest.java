@@ -85,4 +85,21 @@ class ItemRequestServiceIntegrationTest {
                 NotFoundException.class,
                 () -> requestService.getById(999L));
     }
+
+    @Test
+    @DisplayName("Создание запроса для несуществующего пользователя -> NotFoundException")
+    void testCreateRequestNonExistentUser() {
+        ItemRequestDto dto = new ItemRequestDto();
+        dto.setDescription("Need something");
+
+        assertThrows(NotFoundException.class,
+                () -> requestService.create(dto, 999L));
+    }
+
+    @Test
+    @DisplayName("Получение запроса с несуществующим ID -> NotFoundException")
+    void testGetByIdNotFound() {
+        assertThrows(NotFoundException.class,
+                () -> requestService.getById(999L));
+    }
 }

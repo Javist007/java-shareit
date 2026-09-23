@@ -12,8 +12,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import ru.practicum.shareit.exception.model.CommentNotAllowedException;
+import ru.practicum.shareit.exception.model.ItemNotAvailableException;
 import ru.practicum.shareit.item.ItemController;
 import ru.practicum.shareit.item.dto.comment.CommentResponse;
 import ru.practicum.shareit.item.dto.item.ItemDto;
@@ -147,4 +150,34 @@ class ItemControllerTest {
                         .header(USER_ID_HEADER, 1))
                 .andExpect(status().isNotFound());
     }
+    @Test
+    @DisplayName("Покрытие ItemNotAvailableException")
+    void testItemNotAvailable() throws Exception {
+
+        when(itemService.addItem(any(), anyLong())).thenThrow(new ItemNotAvailableException("Not available"));
+
+        mockMvc.perform(post("/items")
+                        .header(USER_ID_HEADER, 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"X\", \"description\":\"Y\", \"available\":true}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Bad Request"))
+                .andExpect(jsonPath("$.message").value("Not available"));
+    }
+
+    @Test
+    @DisplayName("Покрытие CommentNotAllowedException")
+    void testCommentNotAllowed() throws Exception {
+
+        when(commentService.addComment(anyLong(), any(), anyLong())).thenThrow(new CommentNotAllowedException("No booking"));
+
+        mockMvc.perform(post("/items/1/comment")
+                        .header(USER_ID_HEADER, 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\":\"Hi\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Bad Request"))
+                .andExpect(jsonPath("$.message").value("No booking"));
+    }
+
 }
